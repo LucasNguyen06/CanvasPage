@@ -4,6 +4,7 @@ import { ZoomIn, ZoomOut, Undo, Redo } from "lucide-react";
 import { Tool, DrawingSettings } from "@/pages/Index";
 import { toast } from "sonner";
 import HelpBox from "./HelpBox";
+import getStroke from 'perfect-freehand'
 
 interface CanvasProps {
   activeTool: Tool;
@@ -32,6 +33,22 @@ interface TextElement extends CanvasElement {
     size: number;
   };
   editing?: boolean;
+}
+
+function getSvgPathFromStroke(points: number[][], closed = true) {
+  if (points.length < 4) return "";
+
+  const average = (a: number, b: number) => (a + b) / 2;
+  let a = points[0], b = points[1], c = points[2];
+  let result = `M${a[0]},${a[1]} Q${b[0]},${b[1]} ${average(b[0], c[0])},${average(b[1], c[1])} T`;
+
+  for (let i = 2; i < points.length - 1; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${average(a[0], b[0])},${average(a[1], b[1])} `;
+  }
+
+  return closed ? result + "Z" : result;
 }
 
 const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasProps) => {
@@ -150,22 +167,17 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
 
     // Draw all elements
     elements.forEach((element) => {
-      if (element.type === "path" && element.data.points) {
-        ctx.strokeStyle = element.data.color || "#000000";
-        ctx.lineWidth = (element.data.size || 2) * (element.data.pressure || 1);
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        
-        ctx.beginPath();
-        element.data.points.forEach((point: { x: number; y: number }, index: number) => {
-          if (index === 0) {
-            ctx.moveTo(point.x, point.y);
-          } else {
-            ctx.lineTo(point.x, point.y);
-          }
-        });
-        ctx.stroke();
-      } else if (element.type === "text" && !element.editing) {
+    if (element.type === "path" && element.data.points) {
+        const stroke = getStroke(
+            element.data.points.map((p: any) => [p.x, p.y]),
+            { size: element.data.size || 4 }
+        );
+        const pathData = getSvgPathFromStroke(stroke, false);
+        const path = new Path2D(pathData);
+
+        ctx.fillStyle = element.data.color || "#000000";
+        ctx.fill(path);
+    } else if (element.type === "text" && !element.editing) {
         ctx.fillStyle = element.data.color || "#000000";
         ctx.font = `${element.data.size * 8}px Inter, sans-serif`;
         ctx.textBaseline = "top";
@@ -401,7 +413,27 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
     }
 
     if (isDrawing && activeTool === "pencil") {
-      setCurrentPath(prev => [...prev, pos]);
+      if (isDrawing && activeTool === "pencil") {
+        const newPath = [...currentPath, pos];
+        setCurrentPath(newPath);
+
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        if (!ctx) return;
+
+        // Redraw everything
+        redrawCanvas(ctx);
+
+        // Draw the current stroke in-progress
+        const stroke = getStroke(
+            newPath.map((p) => [p.x, p.y]),
+            { size: drawingSettings.size || 4 }
+        );
+        const pathData = getSvgPathFromStroke(stroke, false);
+        const path = new Path2D(pathData);
+        ctx.fillStyle = drawingSettings.color;
+        ctx.fill(path);
+        }
     }
 
     if (isDragging && selectedElement && activeTool === "select") {
