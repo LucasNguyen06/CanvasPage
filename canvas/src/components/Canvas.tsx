@@ -4,7 +4,7 @@ import { ZoomIn, ZoomOut, Undo, Redo } from "lucide-react";
 import { Tool, DrawingSettings } from "@/pages/Index";
 import { toast } from "sonner";
 import HelpBox from "./HelpBox";
-import getStroke from 'perfect-freehand'
+import getStroke from 'perfect-freehand';
 
 interface CanvasProps {
   activeTool: Tool;
@@ -413,7 +413,6 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
     }
 
     if (isDrawing && activeTool === "pencil") {
-      if (isDrawing && activeTool === "pencil") {
         const newPath = [...currentPath, pos];
         setCurrentPath(newPath);
 
@@ -433,7 +432,6 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
         const path = new Path2D(pathData);
         ctx.fillStyle = drawingSettings.color;
         ctx.fill(path);
-        }
     }
 
     if (isDragging && selectedElement && activeTool === "select") {
