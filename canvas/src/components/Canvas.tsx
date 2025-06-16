@@ -126,6 +126,20 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
     redrawCanvas(ctx);
   }, [elements, zoom, panOffset, darkMode, selectedElement]);
 
+  //zoom in/out functionality with scroll wheel
+  useEffect(() => {
+  const handleWheel = (e: WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault(); //prevent normal scroll
+      handleZoom(-e.deltaY * 0.001, { x: e.clientX, y: e.clientY }); //smoother zoom
+    }
+  };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => window.removeEventListener("wheel", handleWheel);
+  }, [zoom, panOffset]);
+
+
   const addToHistory = (newElements: CanvasElement[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push([...newElements]);
@@ -612,8 +626,25 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
     }
   };
 
-  const handleZoom = (delta: number) => {
-    setZoom(prev => Math.max(0.1, Math.min(5, prev + delta)));
+  const handleZoom = (delta: number, zoomCenter?: { x: number, y: number }) => {
+    const newZoom = Math.max(0.1, Math.min(5, zoom + delta));
+    const canvas = canvasRef.current;
+    if (!canvas || !zoomCenter) {
+      setZoom(newZoom);
+      return;
+    }
+
+    //get position  on scren before zoom: converting mouse position from screen coords to canvas coords
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (zoomCenter.x - rect.left - panOffset.x) / zoom;
+    const mouseY = (zoomCenter.y - rect.top - panOffset.y) / zoom;
+
+    //adjust panoffset after zoom. Reposition the canvas so that zoom is centered around the visual spot
+    const newPanX = zoomCenter.x - rect.left - mouseX * newZoom;
+    const newPanY = zoomCenter.y - rect.top - mouseY * newZoom;
+
+    setZoom(newZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
   };
 
   const clearCanvas = () => {
@@ -733,11 +764,14 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
       <div className="absolute bottom-4 left-4 flex items-end gap-2">
         {/* Zoom Controls */}
         <div className="flex items-center gap-1 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border border-border rounded-lg p-1 shadow-lg">
+          //zoom in and out buttons
           <Button
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0"
-            onClick={() => handleZoom(-0.1)}
+            //zoom out by 0.1
+            //width and height divide by 2 to zoom in towards the center of the screen(prevent zoom in towards top left)
+             onClick={(e) => handleZoom(-0.1, { x: window.innerWidth / 2, y: window.innerHeight / 2 })}
           >
             <ZoomOut className="w-3 h-3" />
           </Button>
@@ -746,7 +780,8 @@ const Canvas = ({ activeTool, drawingSettings, darkMode, onOpenHelp }: CanvasPro
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0"
-            onClick={() => handleZoom(0.1)}
+            //same functionality
+            onClick={(e) => handleZoom(0.1, { x: window.innerWidth / 2, y: window.innerHeight / 2 })}
           >
             <ZoomIn className="w-3 h-3" />
           </Button>
